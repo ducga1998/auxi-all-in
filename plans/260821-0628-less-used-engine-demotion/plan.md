@@ -3,8 +3,8 @@
 **Date:** 2026-08-21
 **Repo touched:** `wardrobe-backend` → branch `claude/less-use-item-suggestions-42g8un`
 **Predecessor:** `plans/260626-0005-pr148-usage-frequency-backend/plan.md` §8 (deferred follow-up)
-**Status:** Implemented, pushed, awaiting review + `/v05-eval`
-**Backend PR:** `auxi-wardrobe/auxi-backend#172`
+**Status:** **Merged 2026-09-07** — `/v05-eval` still owed, now post-deploy (§7)
+**Backend PR:** `auxi-wardrobe/auxi-backend#172` (merged as `a46e395` on `main`)
 
 ---
 
@@ -165,9 +165,11 @@ aggressive for real wardrobes — that's the metric to watch after deploy.
   `PoolInsufficient(no_outfits_after_distance_or_exclude_filter)` → the user
   sees *"no more variations"*. With it, a fresh demoted outfit is served.
 - Full backend suite diffed against `origin/main` on the same machine —
-  **264 failures/errors, identical set**, no regressions. (All pre-existing
-  environment gaps: missing `boto3`/google deps, `FakeItem` fixture drift
-  lacking `image_studio`.)
+  **218 failures/errors, identical set on both sides, zero delta**, no
+  regressions. (All pre-existing environment gaps: missing `boto3`/google
+  deps.) Re-measured after merging main at `d5933e9`; the earlier figure of
+  264 was taken before PR #173 landed and fixed the `FakeItem` fixture drift
+  that accounted for the difference.
 - `flake8` on the changed files diffed against baseline — no new findings.
 
 **One existing test was changed, deliberately.**
@@ -188,17 +190,29 @@ to match new behaviour" deserves a reviewer's eye, not a silent edit.
   raises in <300ms), but if the ceiling is ever hit in practice the TTL needs
   raising. Not changed here — it is a deployment tunable, and changing it
   blindly would be a guess.
-- **`/v05-eval` not run** — needs a live DB + LLM keys, unavailable in this
-  environment. Run it before merge to confirm outfit quality and the
-  `PoolInsufficient` rate are unaffected on real wardrobes.
+- **`/v05-eval` still not run — now a POST-deploy check.** It needs a live DB
+  + LLM keys, unavailable in the environment this was built in. It was flagged
+  as a pre-merge step; PR #172 was merged (260907) without it, so the
+  confirmation is now owed *after* deploy rather than before merge. What to
+  watch on real wardrobes: outfit quality unchanged, `PoolInsufficient` rate
+  not up, and the two new relax flags (`less_used_relaxed_no_compose`,
+  `less_used_last_resort`) firing rarely — frequent firing would mean the drop
+  is too aggressive. `scripts/eval_v05_outfits.py` already stores the full
+  response verbatim, so `fallback_flags` and `trace` land in `outfits.json`
+  with **no harness change needed**.
+- **`python test_server.py` not run** (same reason — needs a live stack). The
+  repo's PR checklist asks for it.
 - **Live Redis `try_another` pools seeded before deploy** still hold demoted
   items until their TTL (`V05_TRY_ANOTHER_TTL_SECONDS`, default 1h) expires.
   Self-healing; flush the V05 session keys if the CEO wants it immediate.
 - **Engine V2/V3 untouched.** Confirmed the mobile HomeScreen only calls
   `recommendV05` / `resetV05Session`; the legacy `/recommendation/next` path is
   not reachable from the suggestions surface.
-- **Submodule pointer NOT bumped**, deliberately — the backend branch is
-  unmerged; bump `wardrobe-backend` after that PR lands.
+- **Submodule pointer not bumped in this PR.** The blocker is gone — PR #172
+  merged as `a46e395` on backend `main` — but pointer bumps are the
+  maintainers' own routine `chore:` commit on this repo (the most recent being
+  `e097358`, AU-457), so this PR leaves that to the next sweep rather than
+  sweeping unrelated backend commits into a docs change.
 - **`.gitmodules` URLs are stale.** All four submodules point at
   `ducga1998/*`, but the live repos are `auxi-wardrobe/*` (`wardrobe-backend`
   → `auxi-wardrobe/auxi-backend`, which does contain the currently-pinned
